@@ -21,6 +21,13 @@ class BaseOptions():
         parser.add_argument('--jpg_prob', type=float, default=0)
         parser.add_argument('--jpg_method', default='cv2')
         parser.add_argument('--jpg_qual', default='75')
+        
+        # color jitter parameters
+        parser.add_argument('--color_jitter_prob', type=float, default=0.0, help='probability of applying color jitter')
+        parser.add_argument('--brightness_factor', type=float, default=0.2, help='brightness jittering factor')
+        parser.add_argument('--contrast_factor', type=float, default=0.2, help='contrast jittering factor')
+        parser.add_argument('--saturation_factor', type=float, default=0.2, help='saturation jittering factor')
+        parser.add_argument('--hue_factor', type=float, default=0.1, help='hue jittering factor')
 
         parser.add_argument('--dataroot', default='./dataset/', help='path to images (should have subfolders trainA, trainB, valA, valB, etc)')
         parser.add_argument('--classes', default='', help='image classes to train on')

@@ -37,6 +37,16 @@ def binary_dataset(opt, root):
     else:
         rz_func = transforms.Lambda(lambda img: custom_resize(img, opt))
 
+    if opt.isTrain and hasattr(opt, 'color_jitter_prob') and opt.color_jitter_prob > 0:
+        color_jitter = transforms.ColorJitter(
+            brightness=opt.brightness_factor if hasattr(opt, 'brightness_factor') else 0.2,
+            contrast=opt.contrast_factor if hasattr(opt, 'contrast_factor') else 0.2,
+            saturation=opt.saturation_factor if hasattr(opt, 'saturation_factor') else 0.2,
+            hue=opt.hue_factor if hasattr(opt, 'hue_factor') else 0.1
+        )
+    else:
+        color_jitter = transforms.Lambda(lambda img: img)
+
     dset = datasets.ImageFolder(
             root,
             transforms.Compose([
@@ -44,6 +54,7 @@ def binary_dataset(opt, root):
                 transforms.Lambda(lambda img: data_augment(img, opt)),
                 crop_func,
                 flip_func,
+                color_jitter,
                 transforms.ToTensor(),
                 transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
             ]))
