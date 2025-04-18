@@ -2,9 +2,6 @@ import argparse
 import os
 import util
 import torch
-#import models
-#import data
-
 
 class BaseOptions():
     def __init__(self):
@@ -51,16 +48,18 @@ class BaseOptions():
 
     def gather_options(self):
         # initialize parser with basic options
-        if not self.initialized:
-            parser = argparse.ArgumentParser(
-                formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-            parser = self.initialize(parser)
-
-        # get the basic options
+        parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+        parser = self.initialize(parser)
         opt, _ = parser.parse_known_args()
+        # Fix: ensure gpu_ids is always a list of ints
+        if isinstance(opt.gpu_ids, str):
+            opt.gpu_ids = [int(i) for i in opt.gpu_ids.split(',') if i.strip()]
+        elif isinstance(opt.gpu_ids, int):
+            opt.gpu_ids = [opt.gpu_ids]
+        elif isinstance(opt.gpu_ids, list):
+            opt.gpu_ids = [int(i) for i in opt.gpu_ids]
         self.parser = parser
-
-        return parser.parse_args()
+        return opt
 
     def print_options(self, opt):
         message = ''
@@ -96,14 +95,18 @@ class BaseOptions():
             self.print_options(opt)
 
         # set gpu ids
-        str_ids = opt.gpu_ids.split(',')
+        str_ids = opt.gpu_ids
         opt.gpu_ids = []
         for str_id in str_ids:
             id = int(str_id)
             if id >= 0:
                 opt.gpu_ids.append(id)
+        # Robust CPU handling: if -1 is given, force empty list for CPU
+        if len(opt.gpu_ids) == 0 or (len(str_ids) == 1 and int(str_ids[0]) == -1):
+            opt.gpu_ids = []
         if len(opt.gpu_ids) > 0:
-            torch.cuda.set_device(opt.gpu_ids[0])
+            if torch.cuda.is_available() and opt.gpu_ids[0] >= 0:
+                torch.cuda.set_device(opt.gpu_ids[0])
 
         # additional
         opt.classes = opt.classes.split(',')

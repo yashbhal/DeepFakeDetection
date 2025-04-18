@@ -34,8 +34,28 @@ def get_val_opt():
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--pretrained_path', type=str, default=None, help='Path to pretrained model weights for fine-tuning')
+    parser.add_argument('--finetuned_model_path', type=str, default=None, help='Where to save the best fine-tuned model')
+    parser.add_argument('--niter', type=int, default=50, help='Number of epochs to train')
+    args, unknown = parser.parse_known_args()
+
+    # Remove these args from sys.argv so TrainOptions().parse() works as before
+    import sys
+    sys_argv = sys.argv[:]
+    for arg in ['--pretrained_path', '--finetuned_model_path', '--niter']:
+        if arg in sys_argv:
+            idx = sys_argv.index(arg)
+            sys_argv.pop(idx)
+            if idx < len(sys_argv):
+                sys_argv.pop(idx)
+    sys.argv = sys_argv
+
     opt = TrainOptions().parse()
     opt.dataroot = '{}/{}/'.format(opt.dataroot, opt.train_split)
+    # --- Force both classes for training ---
+    opt.classes = ['real', 'deepfake']
+    print(f"Using classes: {opt.classes} in {opt.dataroot}")
     val_opt = get_val_opt()
 
     data_loader = create_dataloader(opt)
@@ -46,9 +66,20 @@ if __name__ == '__main__':
     val_writer = SummaryWriter(os.path.join(opt.checkpoints_dir, opt.name, "val"))
 
     model = Trainer(opt)
+    # Load pretrained weights if specified
+    if args.pretrained_path is not None:
+        print(f"Loading pretrained weights from {args.pretrained_path}")
+        state_dict = torch.load(args.pretrained_path, map_location='cpu')
+        if 'model' in state_dict:
+            model.model.load_state_dict(state_dict['model'], strict=False)
+        else:
+            model.model.load_state_dict(state_dict, strict=False)
+
     early_stopping = EarlyStopping(patience=opt.earlystop_epoch, delta=-0.001, verbose=True)
-    for epoch in range(opt.niter):
+    best_val_metric = -float('inf')
+    for epoch in range(args.niter):
         epoch_start_time = time.time()
+        print(f"\n======== Epoch {epoch+1}/{args.niter} ========")
         iter_data_time = time.time()
         epoch_iter = 0
 
@@ -68,8 +99,15 @@ if __name__ == '__main__':
                       (opt.name, epoch, model.total_steps))
                 model.save_networks('latest')
 
-            # print("Iter time: %d sec" % (time.time()-iter_data_time))
-            # iter_data_time = time.time()
+        # Log epoch timing
+        epoch_time = time.time() - epoch_start_time
+        print(f"Epoch {epoch+1} completed in {epoch_time:.2f} seconds ({epoch_time/60:.2f} min)")
+        if epoch > 0:
+            avg_time = (time.time() - epoch_start_time) / (epoch+1)
+            eta = avg_time * (args.niter - (epoch+1))
+            print(f"Estimated time remaining: {eta/60:.2f} min ({eta/3600:.2f} hr)")
+        else:
+            first_epoch_time = epoch_start_time
 
         if epoch % opt.save_epoch_freq == 0:
             print('saving the model at the end of epoch %d, iters %d' %
@@ -82,7 +120,13 @@ if __name__ == '__main__':
         acc, ap = validate(model.model, val_opt)[:2]
         val_writer.add_scalar('accuracy', acc, model.total_steps)
         val_writer.add_scalar('ap', ap, model.total_steps)
-        print("(Val @ epoch {}) acc: {}; ap: {}".format(epoch, acc, ap))
+        print(f"(Val @ epoch {epoch}) acc: {acc}; ap: {ap}")
+
+        if acc > best_val_metric:
+            best_val_metric = acc
+            save_path = args.finetuned_model_path if args.finetuned_model_path else os.path.join(opt.checkpoints_dir, opt.name, f'finetuned_colorjitter_{args.niter}epochs.pth')
+            print(f"Saving best fine-tuned model to {save_path}")
+            torch.save({'model': model.model.state_dict()}, save_path)
 
         early_stopping(acc, model)
         if early_stopping.early_stop:
@@ -94,4 +138,3 @@ if __name__ == '__main__':
                 print("Early stopping.")
                 break
         model.train()
-

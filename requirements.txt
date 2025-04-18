@@ -5,3 +5,13 @@ opencv_python
 Pillow
 torch>=1.2.0
 torchvision
+
+# Additional requirements for M1/Mac compatibility and repo code
+matplotlib
+h5py
+# For tqdm progress bars (often used in training/eval scripts)
+tqdm
+# For YAML config support (common in ML repos)
+pyyaml
+# For PIL image plugin warnings
+imageio

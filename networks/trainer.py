@@ -34,7 +34,11 @@ class Trainer(BaseModel):
 
         if not self.isTrain or opt.continue_train:
             self.load_networks(opt.epoch)
-        self.model.to(opt.gpu_ids[0])
+        # Robust device assignment for CPU/any device
+        if hasattr(opt, 'gpu_ids') and len(opt.gpu_ids) > 0 and torch.cuda.is_available():
+            self.model.to(torch.device(f'cuda:{opt.gpu_ids[0]}'))
+        else:
+            self.model.to(torch.device('cpu'))
 
 
     def adjust_learning_rate(self, min_lr=1e-6):
@@ -61,4 +65,3 @@ class Trainer(BaseModel):
         self.optimizer.zero_grad()
         self.loss.backward()
         self.optimizer.step()
-

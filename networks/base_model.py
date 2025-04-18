@@ -13,7 +13,12 @@ class BaseModel(nn.Module):
         self.total_steps = 0
         self.isTrain = opt.isTrain
         self.save_dir = os.path.join(opt.checkpoints_dir, opt.name)
-        self.device = torch.device('cuda:{}'.format(opt.gpu_ids[0])) if opt.gpu_ids else torch.device('cpu')
+        
+        # Robust device assignment for CPU/any device
+        if hasattr(opt, 'gpu_ids') and len(opt.gpu_ids) > 0 and torch.cuda.is_available():
+            self.device = torch.device(f'cuda:{opt.gpu_ids[0]}')
+        else:
+            self.device = torch.device('cpu')
 
     def save_networks(self, epoch):
         save_filename = 'model_epoch_%s.pth' % epoch

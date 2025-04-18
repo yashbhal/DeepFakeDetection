@@ -6,12 +6,8 @@ from .datasets import dataset_folder
 
 
 def get_dataset(opt):
-    dset_lst = []
-    for cls in opt.classes:
-        root = opt.dataroot + '/' + cls
-        dset = dataset_folder(opt, root)
-        dset_lst.append(dset)
-    return torch.utils.data.ConcatDataset(dset_lst)
+    # Fix: Just use ImageFolder on the root directory, not per-class
+    return dataset_folder(opt, opt.dataroot)
 
 
 def get_bal_sampler(dataset):

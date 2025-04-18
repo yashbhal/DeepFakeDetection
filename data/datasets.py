@@ -12,6 +12,15 @@ from scipy.ndimage.filters import gaussian_filter
 
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
+def identity_transform(img):
+    return img
+
+def resize_transform(img, opt):
+    return custom_resize(img, opt)
+
+def data_augment_transform(img, opt):
+    return data_augment(img, opt)
+
 def dataset_folder(opt, root):
     if opt.mode == 'binary':
         return binary_dataset(opt, root)
@@ -24,18 +33,18 @@ def binary_dataset(opt, root):
     if opt.isTrain:
         crop_func = transforms.RandomCrop(opt.cropSize)
     elif opt.no_crop:
-        crop_func = transforms.Lambda(lambda img: img)
+        crop_func = identity_transform
     else:
         crop_func = transforms.CenterCrop(opt.cropSize)
 
     if opt.isTrain and not opt.no_flip:
         flip_func = transforms.RandomHorizontalFlip()
     else:
-        flip_func = transforms.Lambda(lambda img: img)
+        flip_func = identity_transform
     if not opt.isTrain and opt.no_resize:
-        rz_func = transforms.Lambda(lambda img: img)
+        rz_func = identity_transform
     else:
-        rz_func = transforms.Lambda(lambda img: custom_resize(img, opt))
+        rz_func = ResizeTransform(opt)
 
     if opt.isTrain and hasattr(opt, 'color_jitter_prob') and opt.color_jitter_prob > 0:
         color_jitter = transforms.ColorJitter(
@@ -45,13 +54,13 @@ def binary_dataset(opt, root):
             hue=opt.hue_factor if hasattr(opt, 'hue_factor') else 0.1
         )
     else:
-        color_jitter = transforms.Lambda(lambda img: img)
+        color_jitter = identity_transform
 
     dset = datasets.ImageFolder(
             root,
             transforms.Compose([
                 rz_func,
-                transforms.Lambda(lambda img: data_augment(img, opt)),
+                DataAugmentTransform(opt),
                 crop_func,
                 flip_func,
                 color_jitter,
@@ -143,3 +152,16 @@ rz_dict = {'bilinear': Image.BILINEAR,
 def custom_resize(img, opt):
     interp = sample_discrete(opt.rz_interp)
     return TF.resize(img, opt.loadSize, interpolation=rz_dict[interp])
+
+# --- Top-level callable transform classes for multiprocessing-safe transforms ---
+class ResizeTransform:
+    def __init__(self, opt):
+        self.opt = opt
+    def __call__(self, img):
+        return resize_transform(img, self.opt)
+
+class DataAugmentTransform:
+    def __init__(self, opt):
+        self.opt = opt
+    def __call__(self, img):
+        return data_augment_transform(img, self.opt)
