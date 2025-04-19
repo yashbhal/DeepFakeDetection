@@ -27,7 +27,8 @@ def main():
     sys.argv = sys_argv
 
     opt = TestOptions().parse(print_options=False)
-    model_name = os.path.basename(model_path).replace('.pth', '')
+    model_name = os.path.basename(opt.model_path).replace('.pth', '')
+    model_path = opt.model_path
     header = ["testset", "accuracy", "avg precision", "precision", "recall", "f1", "real_acc", "fake_acc", "tn", "fp", "fn", "tp"]
     rows = [["{} model testing on...".format(model_name)], header]
 
